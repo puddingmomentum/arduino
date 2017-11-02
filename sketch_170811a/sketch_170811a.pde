@@ -1,9 +1,7 @@
-import ddf.minim.*;
-import ddf.minim.analysis.*;
-import ddf.minim.effects.*;
-import ddf.minim.signals.*;
-import ddf.minim.spi.*;
-import ddf.minim.ugens.*;
+import ddf.minim.*; //<>// //<>// //<>// //<>//
+/* This requires speakers or headphones to be attached
+ or else the audio will fail to load
+ */
 
 import processing.serial.*;
 import java.io.File;
@@ -13,9 +11,14 @@ import java.util.Collections;
 Serial myPort;
 int nl = int('\n');
 String sInput = "0";
+int currPlayer = -1;
+
+int numSounds = 0;
 Minim minim;
-AudioPlayer player;
+AudioPlayer[] player;
+
 PFont font;
+
 short portIndex = 0;
 String portName;
 String filename;
@@ -25,28 +28,37 @@ Vector<File> files;
 
 void setup() {
   // put your setup code here, to run once:
-  size(640, 480, P2D);
+  size(640, 480);
   font = createFont("Arial", 16, true);
 
-
+  minim = new Minim(this);
   println(" Connecting to -> " + Serial.list()[portIndex]);
-  portName = Serial.list()[portIndex];
+  try {
+    portName = Serial.list()[portIndex];
+  } 
+  catch (ArrayIndexOutOfBoundsException ae) {
+    println("Index error. Serial list: " + Serial.list());
+    return;
+  }
   myPort = new Serial(this, portName, 9600);
   myPort.bufferUntil(nl);
 
-  dir = new String("/home/rob/sketchbook/arduino/sketch_170811a/sounds");
+  dir = new String("C:\\Users\\rober\\Development\\arduino\\sketch_170811a\\sounds");
   files = new Vector<File>();
 
-  int retval = getdir(dir, files);
-  System.out.println(files.firstElement().getPath());
-  //for (File f : files) {
-  //  System.out.println(f.getName());
-  //}
+  getdir(dir, files);
+  numSounds = files.size();
+  System.out.println(numSounds);
 
-  // filename = filename.replaceAll(" ", "\ ");
+  player = new AudioPlayer[numSounds];
+
+  int i = 0;
+  for (File f : files) {
+    player[i] = minim.loadFile(f.getAbsolutePath());
+    i++;
+  }
 
   frameRate(10);
-  minim = new Minim(this);
 }
 
 void draw() {
@@ -57,23 +69,25 @@ void draw() {
   sInput = "";
   int iInput = 0;
   String[] list;
-
-  filename = files.firstElement().getPath();  // change to random choice or sequential
-  player = minim.loadFile(filename, 1024);
+  
 
   if (myPort.available() > 0) {
     sInput = myPort.readString();
     //    System.out.println(sInput);
     list = split(sInput, '\r');
     ArrayList<Integer> values = new ArrayList<Integer>(15);
-    for (String a : list) {
-      if (!a.isEmpty()) { 
-        try {
-          values.add( (new Integer(a)).intValue() );
-        } 
-        catch (NumberFormatException e) {
+    try {
+      for (String a : list) {
+        if (!a.isEmpty()) { 
+          try {
+            values.add( (new Integer(a)).intValue() );
+          } 
+          catch (NumberFormatException e) {
+          }
         }
       }
+    } 
+    catch (NullPointerException np) {
     }
     Collections.sort(values);
     //for (Integer i : values) {
@@ -84,11 +98,22 @@ void draw() {
       System.out.println("Top Value: " + iInput);
 
       if (iInput > 100) {
-        if (player.isPlaying()) { player.pause(); }
+        if (currPlayer == files.size() || currPlayer == -1) {currPlayer = 0;}
+          else {currPlayer++;}
+          println("currPlayer: " + currPlayer);        
+          //try {
+        //  if (player[currPlayer].isPlaying()) { player.pause(); }
+        //} catch (ArrayIndexOutOfBoundsException ae) {}
         if (!sInput.isEmpty()) {
           text(sInput, 10, 100);
         }
-        player.play();
+ //       currPlayer = round(random(numSounds));
+        player[currPlayer].play();
+        //while (player[currPlayer].isPlaying()) {}
+        delay(1000);
+        player[currPlayer].pause();
+        player[currPlayer].rewind();
+        player[currPlayer].cue(0);
       }
     }
   }
@@ -104,15 +129,15 @@ void draw() {
 //}
 
 int getdir(String dir, Vector<File> files) {
-  File f;
+  //  File f;
   File[] list;
   try {
-    f = new File(dir);
-    list  = f.listFiles(new MyFilter());
+    //    f = new File(dir);
+    list  = new File(dir).listFiles(new MyFilter());
 
-    for (File fi : list) {
-      System.out.println(fi.getName());
-      files.add(fi);
+    for (File f : list) {
+      System.out.println(f.getName());
+      files.add(f);
     }
   } 
   catch (NullPointerException e) {
